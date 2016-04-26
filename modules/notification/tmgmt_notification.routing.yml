@@ -1,0 +1,7 @@
+couriertemp:
+  path: '/admin/config/courier_temp'
+  defaults:
+    _form: '\Drupal\tmgmt_notification\Form\CourierTemp'
+    _title: 'courier temp'
+  requirements:
+    _permission: 'administer tmgmt'

@@ -25,15 +25,25 @@ function tmgmt_notification_theme() {
  * Implements hook_tmgmt_courier_trigger_types().
  */
 function tmgmt_notification_tmgmt_courier_trigger_types(&$types) {
+  // context/token registry should be elsewhere.
+
   $types['job_item_needs_review'] = [
-    'context' => 'tmgmt_notification',
+    'context' => 'tmgmt_notification_job_item',
+    'tokens' => ['tmgmt_job_item', 'tmgmt_job'],
     'label' => 'Job item needs review',
     'description' => 'Sent when a Job item is set to "needs review".',
   ];
   $types['job_item_autoaccepted'] = [
-    'context' => 'tmgmt_notification',
+    'context' => 'tmgmt_notification_job_item',
+    'tokens' => ['tmgmt_job_item', 'tmgmt_job'],
     'label' => 'Autoaccepted translation',
     'description' => 'Sent when a Job item is set to "completed" automatically.',
+  ];
+  $types['job_new'] = [
+    'context' => 'tmgmt_notification_job',
+    'tokens' => ['tmgmt_job_item'],
+    'label' => 'foo',
+    'description' => 'bar',
   ];
 }
 
@@ -43,10 +53,31 @@ function tmgmt_notification_tmgmt_courier_trigger_types(&$types) {
 function tmgmt_notification_tmgmt_job_item_update(JobItemInterface $job_item) {
   /** @var \Drupal\tmgmt\JobItemInterface $original */
   $original = $job_item->original;
+  /** @var \Drupal\tmgmt_courier\Notification $notification */
+  $notification = \Drupal::service('tmgmt_courier.notification');
   if ($job_item->isNeedsReview() && !$original->isNeedsReview()) {
-    \Drupal::service('tmgmt_courier.notification')->sendNotification('job_item_needs_review', ['tmgmt_job_item' => $job_item, 'tmgmt_job' => $job_item->getJob()]);
+    $notification->sendNotification('job_item_needs_review', ['job_item' => $job_item]);
   }
   if (!$original->isNeedsReview() && !$original->isAccepted() && $job_item->isAccepted()) {
-    \Drupal::service('tmgmt_courier.notification')->sendNotification('job_item_autoaccepted', ['tmgmt_job_item' => $job_item, 'tmgmt_job' => $job_item->getJob()]);
+    $notification->sendNotification('job_item_autoaccepted', ['job_item' => $job_item]);
   }
 }
+
+function tmgmt_notification_tmgmt_job_insert(\Drupal\tmgmt\JobInterface $job) {
+  /** @var \Drupal\tmgmt_courier\Notification $notification */
+  $notification = \Drupal::service('tmgmt_courier.notification');
+  $notification->sendNotification('job_new', ['job' => $job]);
+}
+
+/**
+ * Implements hook_entity_access().
+ */
+function tmgmt_notification_entity_access(\Drupal\Core\Entity\EntityInterface $entity, $operation, \Drupal\Core\Session\AccountInterface $account) {
+  if ($operation == 'templates' && $entity instanceof \Drupal\courier\TemplateCollectionInterface) {
+    $tcids = \Drupal::state()->get('tmgmt_notification.tcids', []);
+    return \Drupal\Core\Access\AccessResult::allowedIf(in_array($entity->id(), $tcids));
+  }
+  return \Drupal\Core\Access\AccessResult::neutral();
+}
+
+
